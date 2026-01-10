@@ -3,10 +3,10 @@
 
 # n8n runtime data / local state
 .n8n/
+binaryData/
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
-binaryData/
 
 # Node
 node_modules/
@@ -14,7 +14,6 @@ node_modules/
 # Cloudflared credentials
 **/.cloudflared/
 cert.pem
-*.json
 
 # Keys
 *.pem
