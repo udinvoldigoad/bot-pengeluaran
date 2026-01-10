@@ -1,0 +1,25 @@
+# Secrets
+.env
+
+# n8n runtime data / local state
+.n8n/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+binaryData/
+
+# Node
+node_modules/
+
+# Cloudflared credentials
+**/.cloudflared/
+cert.pem
+*.json
+
+# Keys
+*.pem
+*.key
+
+# OS
+.DS_Store
+Thumbs.db
