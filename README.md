@@ -35,3 +35,7 @@ Bot ini dibangun menggunakan **n8n yang di host di AWS Free Tier** menerima webh
 7. Setup Credentials di n8n:
     - Telegram Bot Token
     - Google Sheets OAuth2
+
+## Keamanan
+- Repository ini tidak menyertakan credential apa pun
+- Jangan pernah commit `.env` atau data volume n8n
