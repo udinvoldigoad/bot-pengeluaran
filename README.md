@@ -52,10 +52,10 @@ Salin file contoh environment:
 cp .env.example .env
 ```
 Isi variabel penting di .env (sesuaikan dengan file Anda):
-    N8N_HOST=localhost
-    N8N_PORT=5678
-    N8N_PROTOCOL=http
-    WEBHOOK_URL= (kosong dulu, akan diisi setelah ngrok jalan)
+- N8N_HOST=localhost
+- N8N_PORT=5678
+- N8N_PROTOCOL=http
+- WEBHOOK_URL= (kosong dulu, akan diisi setelah ngrok jalan)
 Jangan pernah commit file .env.
 
 ### 3. Jalankan n8n
