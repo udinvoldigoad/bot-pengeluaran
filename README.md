@@ -23,8 +23,8 @@ Contoh input:
 
 ## Arsitektur (Local Development)
 
-- **n8n** dijalankan di localhost menggunakan Docker
-- **ngrok** digunakan untuk menyediakan URL HTTPS publik (dibutuhkan Telegram webhook)
+- **n8n** dijalankan via CLI (`n8n start`)
+- **ngrok** menyediakan URL HTTPS publik (untuk Telegram webhook)
 - **Google Sheets** sebagai penyimpanan data
 - **Telegram Bot** sebagai interface pengguna
 
@@ -32,14 +32,15 @@ Contoh input:
 
 ## Prasyarat
 Pastikan sudah terinstall:
-- Docker & Docker Compose
+- Node.js (untuk menjalankan n8n CLI)
+- n8n (global / local install)
 - Akun ngrok
 - Telegram Bot Token (dari BotFather)
 - Akun Google untuk Google Sheets (OAuth2 di n8n)
 
 ---
 
-## Cara Menjalankan di Localhost (Docker + ngrok)
+## Cara Menjalankan di Localhost (n8n CLI + ngrok)
 
 ### 1. Clone repository
 ```bash
@@ -60,7 +61,7 @@ Jangan pernah commit file .env.
 
 ### 3. Jalankan n8n
 ```bash
-docker compose up -d
+n8n start
 ```
 Buka n8n di browser: `http://localhost:5678`
 
@@ -77,11 +78,7 @@ Edit file .env dan isi:
 ```bash
 WEBHOOK_URL=https://abcd-1234.ngrok-free.app
 ```
-Setelah itu restart n8n:
-```bash
-docker compose down
-docker compose up -d
-```
+Setelah itu restart n8n (CTRL + C lalu `n8n start`)
 Langkah ini wajib agar Telegram webhook mengarah ke URL publik (bukan localhost).
 
 ### 6. Import workflow n8n
