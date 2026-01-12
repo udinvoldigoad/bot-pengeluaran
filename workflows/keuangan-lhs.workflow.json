@@ -26,7 +26,7 @@
     },
     {
       "parameters": {
-        "jsCode": "function formatRupiah(n) {\n  const s = Math.round(Number(n || 0)).toString();\n  return \"Rp.\" + s.replace(/\\B(?=(\\d{3})+(?!\\d))/g, \".\");\n}\n\n// Ambil waktu dari Telegram (msg.date = unix seconds, UTC epoch)\n// Ini membuat timestamp tidak pernah \"lebih maju\" dari server, sehingga /week tidak 0 lagi.\nfunction dateTimeFromTelegram(msgDateSec) {\n  const utc = new Date((msgDateSec || Math.floor(Date.now() / 1000)) * 1000);\n  const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;\n  const wib = new Date(utc.getTime() + WIB_OFFSET_MS);\n\n  const pad = (x) => String(x).padStart(2, \"0\");\n  const yyyy = wib.getUTCFullYear();\n  const mm = pad(wib.getUTCMonth() + 1);\n  const dd = pad(wib.getUTCDate());\n  const hh = pad(wib.getUTCHours());\n  const mi = pad(wib.getUTCMinutes());\n  const ss = pad(wib.getUTCSeconds());\n\n  return {\n    timestamp: utc.toISOString(), // UTC ISO konsisten\n    date: `${yyyy}-${mm}-${dd}`,  // WIB\n    time: `${hh}:${mi}:${ss}`,    // WIB\n  };\n}\n\nfunction extractCategory(text) {\n  // kategori = kata pertama (huruf/angka/underscore/dash) setelah spasi awal\n  // contoh: \"geprek 12k\" => \"geprek\", \"bensin 55k\" => \"bensin\"\n  const t = text.trim();\n  const m = t.match(/^([a-zA-Z0-9_-]+)/);\n  return m ? m[1].toLowerCase() : \"lainnya\";\n}\n\nfunction extractAmount(text) {\n  const lower = text.toLowerCase();\n\n  // Ambil angka pertama dengan opsi desimal koma/titik + suffix k/rb/ribu\n  // contoh: 25.5k, 25,5k, 12k, 15000, 15rb, 2.000\n  const m = lower.match(/(\\d[\\d.,]*)\\s*(k|rb|ribu)?\\b/);\n  if (!m) return null;\n\n  let numStr = m[1].trim();\n\n  // Normalisasi:\n  // - jika ada koma sebagai desimal (25,5k) -> 25.5\n  // - jika ada titik sebagai desimal (25.5k) -> 25.5\n  // - jika ada pemisah ribuan (2.000) -> 2000\n  // Aturan:\n  // 1) Jika ada suffix k/rb/ribu, kita izinkan desimal: 25.5k = 25500\n  // 2) Jika tidak ada suffix, kita anggap . dan , sebagai pemisah ribuan: 2.000 = 2000\n  const suf = m[2];\n\n  if (suf === \"k\" || suf === \"rb\" || suf === \"ribu\") {\n    // ubah koma jadi titik untuk desimal\n    numStr = numStr.replace(/,/g, \".\");\n    // hapus pemisah ribuan: \"1.234.5\" tidak umum, tapi aman: hapus semua kecuali digit dan titik pertama\n    // pendekatan: jika ada lebih dari 1 titik, hapus semua titik lalu pakai integer\n    const dots = (numStr.match(/\\./g) || []).length;\n    let val;\n    if (dots <= 1) {\n      val = parseFloat(numStr);\n    } else {\n      val = parseFloat(numStr.replace(/\\./g, \"\"));\n    }\n    if (!isFinite(val)) return null;\n    return Math.round(val * 1000);\n  } else {\n    // tanpa suffix: anggap titik/koma sebagai pemisah ribuan\n    const digits = numStr.replace(/[^\\d]/g, \"\");\n    const val = parseInt(digits, 10);\n    return Number.isFinite(val) ? val : null;\n  }\n}\n\nconst msg = $json.message;\nconst rawText = (msg?.text || \"\").trim();\n\nconst user_id = msg?.from?.id;\nconst username = msg?.from?.username || msg?.from?.first_name || \"unknown\";\nconst chat_id = msg?.chat?.id;\n\nif (!rawText) {\n  return [{\n    type: \"error\",\n    chat_id,\n    reply: \"Saya hanya memproses teks. Contoh: geprek 12k\",\n  }];\n}\n\nconst lower = rawText.toLowerCase();\nlet type = \"add\";\nif (lower.startsWith(\"/week\")) type = \"week\";\nif (lower.startsWith(\"/undo\")) type = \"undo\";\n\nconst t = dateTimeFromTelegram(msg?.date);\n\nlet amount = null;\nlet category = null;\n\n// Untuk add:\nif (type === \"add\") {\n  amount = extractAmount(rawText);\n  category = extractCategory(rawText);\n\n  if (!amount) {\n    return [{\n      type: \"error\",\n      chat_id,\n      reply: \"Nominal tidak ditemukan. Contoh: geprek 12k / bensin 55k / parkir 2.000 / ayam 25.5k\",\n    }];\n  }\n}\n\nconst id = `${Date.now()}-${user_id}`;\n\n// Template reply add sesuai permintaanmu (tanpa note)\nconst reply_add =\n  `✅ Tercatat\\n\\n` +\n  `🗂️ Kategori : ${category}\\n` +\n  `💵 Nominal  : ${formatRupiah(amount)}\\n\\n` +\n  `🗓️ ${t.date}\\n` +\n  `🕰️ ${t.time}`;\n\nreturn [{\n  type,\n  id,\n  timestamp: t.timestamp, // UTC ISO dari Telegram\n  date: t.date,           // WIB\n  time: t.time,           // WIB\n  user_id,\n  username,\n  chat_id,\n  amount,\n  category,\n  raw_text: rawText,\n  reply_add,\n}];\n"
+        "jsCode": "function formatRupiah(n) {\n  const s = Math.round(Number(n || 0)).toString();\n  return \"Rp.\" + s.replace(/\\B(?=(\\d{3})+(?!\\d))/g, \".\");\n}\n\n// Ambil waktu dari Telegram (msg.date = unix seconds, UTC epoch)\n// Ini membuat timestamp tidak pernah \"lebih maju\" dari server, sehingga /week tidak 0 lagi.\nfunction dateTimeFromTelegram(msgDateSec) {\n  const utc = new Date((msgDateSec || Math.floor(Date.now() / 1000)) * 1000);\n  const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;\n  const wib = new Date(utc.getTime() + WIB_OFFSET_MS);\n\n  const pad = (x) => String(x).padStart(2, \"0\");\n  const yyyy = wib.getUTCFullYear();\n  const mm = pad(wib.getUTCMonth() + 1);\n  const dd = pad(wib.getUTCDate());\n  const hh = pad(wib.getUTCHours());\n  const mi = pad(wib.getUTCMinutes());\n  const ss = pad(wib.getUTCSeconds());\n\n  return {\n    timestamp: utc.toISOString(), // UTC ISO konsisten\n    date: `${yyyy}-${mm}-${dd}`,  // WIB\n    time: `${hh}:${mi}:${ss}`,    // WIB\n  };\n}\n\nfunction extractAmount(text) {\n  const lower = text.toLowerCase();\n\n  // Ambil angka pertama dengan opsi desimal koma/titik + suffix k/rb/ribu\n  // contoh: 25.5k, 25,5k, 12k, 15000, 15rb, 2.000\n  const m = lower.match(/(\\d[\\d.,]*)\\s*(k|rb|ribu)?\\b/);\n  if (!m) return null;\n\n  let numStr = m[1].trim();\n  const suf = m[2];\n\n  if (suf === \"k\" || suf === \"rb\" || suf === \"ribu\") {\n    // ubah koma jadi titik untuk desimal\n    numStr = numStr.replace(/,/g, \".\");\n    const dots = (numStr.match(/\\./g) || []).length;\n    let val;\n    if (dots <= 1) {\n      val = parseFloat(numStr);\n    } else {\n      val = parseFloat(numStr.replace(/\\./g, \"\"));\n    }\n    if (!isFinite(val)) return null;\n    return Math.round(val * 1000);\n  } else {\n    // tanpa suffix: anggap titik/koma sebagai pemisah ribuan\n    const digits = numStr.replace(/[^\\d]/g, \"\");\n    if (!digits) return null;\n    const val = Number(digits);\n    if (!isFinite(val)) return null;\n    return val;\n  }\n}\n\n/**\n * KATEGORI BARU:\n * - ambil semua kata sebelum token nominal pertama\n * - contoh: \"mie ayam 12k\" -> \"mie ayam\"\n * - kalau nominal ada di awal (mis. \"12k mie\") kategori jadi \"lainnya\" (sesuai kebiasaan Anda input)\n */\nfunction extractCategory(text) {\n  const t = (text || \"\").trim();\n  if (!t) return \"lainnya\";\n\n  // Cari posisi nominal pertama (pakai regex yang sama konsepnya dengan extractAmount)\n  const m = t.toLowerCase().match(/(\\d[\\d.,]*)\\s*(k|rb|ribu)?\\b/);\n  if (!m || m.index == null) {\n    // fallback lama: kata pertama\n    const m2 = t.match(/^([a-zA-Z0-9_-]+)/);\n    return m2 ? m2[1].toLowerCase() : \"lainnya\";\n  }\n\n  const before = t.slice(0, m.index).trim();\n  if (!before) return \"lainnya\";\n\n  // rapikan spasi ganda\n  return before.replace(/\\s+/g, \" \").toLowerCase();\n}\n\nconst msg = $json.message;\nconst rawText = (msg?.text || \"\").trim();\n\nconst user_id = msg?.from?.id;\nconst username = msg?.from?.username || msg?.from?.first_name || \"unknown\";\nconst chat_id = msg?.chat?.id;\n\nif (!rawText) {\n  return [{\n    type: \"error\",\n    chat_id,\n    reply: \"Saya hanya memproses teks. Contoh: geprek 12k\",\n  }];\n}\n\nconst lower = rawText.toLowerCase();\nlet type = \"add\";\nif (lower.startsWith(\"/week\")) type = \"week\";\nif (lower.startsWith(\"/undo\")) type = \"undo\";\nif (lower.startsWith(\"/download\")) type = \"download\";\n\nconst t = dateTimeFromTelegram(msg?.date);\n\nlet amount = null;\nlet category = null;\n\n// Untuk add:\nif (type === \"add\") {\n  amount = extractAmount(rawText);\n  category = extractCategory(rawText);\n\n  if (!amount) {\n    return [{\n      type: \"error\",\n      chat_id,\n      reply: \"Nominal tidak ditemukan. Contoh: geprek 12k / bensin 55k / parkir 2.000 / ayam 25.5k\",\n    }];\n  }\n}\n\nconst id = `${Date.now()}-${user_id}`;\n\n// Template reply add sesuai permintaanmu (tanpa note)\nconst reply_add =\n  `✅ Tercatat\\n\\n` +\n  `🗂️ Kategori : ${category}\\n` +\n  `💵 Nominal  : ${formatRupiah(amount)}\\n\\n` +\n  `🗓️ ${t.date}\\n` +\n  `🕰️ ${t.time}`;\n\nreturn [{\n  type,\n  id,\n  timestamp: t.timestamp, // UTC ISO dari Telegram\n  date: t.date,           // WIB\n  time: t.time,           // WIB\n  user_id,\n  username,\n  chat_id,\n  amount,\n  category,\n  raw_text: rawText,\n  reply_add,\n}];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -108,6 +108,29 @@
                 ],
                 "combinator": "and"
               }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "2220a3dc-fda2-4a08-b91c-a2bf8f19420a",
+                    "leftValue": "={{$json.type}}",
+                    "rightValue": "download",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
             }
           ]
         },
@@ -133,8 +156,8 @@
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        224,
-        0
+        240,
+        -144
       ],
       "id": "4b347847-81d7-40af-8d95-399ae14c0af8",
       "name": "Send a text message",
@@ -313,7 +336,7 @@
       "typeVersion": 4.7,
       "position": [
         0,
-        0
+        -144
       ],
       "id": "16874325-cc14-4c4b-a7f1-e628a2845b01",
       "name": "Append row in sheet",
@@ -352,7 +375,7 @@
       "typeVersion": 4.7,
       "position": [
         0,
-        176
+        80
       ],
       "id": "ed95a384-406b-4b15-96a2-b4e6551082be",
       "name": "Get row(s) in sheet",
@@ -365,13 +388,13 @@
     },
     {
       "parameters": {
-        "jsCode": "const rows = items.map(i => i.json);\nconst chatId = String($node[\"Telegram Trigger\"].json.message.chat.id);\nconst pick = (v) => Array.isArray(v) ? v[0] : v;\n\nconst formatRupiah = (n) => \"Rp.\" + Number(n || 0).toLocaleString(\"id-ID\");\n\nconst isDeleted = (v) => {\n  v = pick(v);\n  if (v === true) return true;\n  if (v === false || v == null || v === \"\") return false;\n  const s = String(v).toLowerCase().trim();\n  return [\"true\", \"yes\", \"1\"].includes(s);\n};\n\nconst parseAmount = (v) => {\n  v = pick(v);\n  if (v == null || v === \"\") return NaN;\n  if (typeof v === \"number\") return v;\n  const digits = String(v).replace(/[^\\d]/g, \"\");\n  return digits ? Number(digits) : NaN;\n};\n\nconst WIB_OFFSET_MS = 7 * 60 * 60 * 1000;\nconst DAY_MS = 24 * 60 * 60 * 1000;\n\nconst nowUtcMs = Date.now();\nconst startUtcMs = nowUtcMs - 7 * DAY_MS;\n\nconst wibDateStringFromUtcMs = (utcMs) => {\n  const w = new Date(utcMs + WIB_OFFSET_MS);\n  const yy = w.getUTCFullYear();\n  const mm = String(w.getUTCMonth() + 1).padStart(2, \"0\");\n  const dd = String(w.getUTCDate()).padStart(2, \"0\");\n  return `${yy}-${mm}-${dd}`;\n};\n\nconst startStr = wibDateStringFromUtcMs(startUtcMs);\nconst endStr = wibDateStringFromUtcMs(nowUtcMs);\n\nconst filtered = rows.filter(r => {\n  if (String(pick(r.chat_id)) !== chatId) return false;\n  if (isDeleted(r.is_deleted)) return false;\n\n  const ts = new Date(pick(r.timestamp));\n  const tsMs = ts.getTime();\n  if (!Number.isFinite(tsMs)) return false;\n\n  return tsMs >= startUtcMs && tsMs <= nowUtcMs;\n});\n\nlet total = 0;\nconst perCategory = {};\n\nfor (const r of filtered) {\n  const amt = parseAmount(r.amount);\n  if (!isFinite(amt) || amt <= 0) continue;\n\n  total += amt;\n\n  const cat = (pick(r.category) || \"lainnya\");\n  perCategory[cat] = (perCategory[cat] || 0) + amt;\n}\n\nlet text = `📊 Rekap 7 Hari Terakhir\\n`;\ntext += `🗓️ ${startStr} s/d ${endStr} (WIB)\\n\\n`;\ntext += `💵 Total: ${formatRupiah(total)}\\n`;\ntext += `🧾 Transaksi: ${filtered.length}\\n\\n`;\n\nif (filtered.length === 0) {\n  text += `Belum ada transaksi 7 hari terakhir.`;\n} else {\n  text += `🗂️ Per Kategori:\\n`;\n  Object.entries(perCategory)\n    .sort((a, b) => b[1] - a[1])\n    .forEach(([cat, amt]) => {\n      text += `• ${cat}: ${formatRupiah(amt)}\\n`;\n    });\n}\n\nreturn [{ json: { chat_id: chatId, reply: text } }];\n"
+        "jsCode": "const rows = items.map(i => i.json);\n\nconst tgMsg = $node[\"Telegram Trigger\"].json.message;\nconst chatId = String(tgMsg.chat.id);          // untuk reply\nconst reqUserId = String(tgMsg.from.id);       // untuk filter multi-user\n\nconst pick = (v) => Array.isArray(v) ? v[0] : v;\nconst formatRupiah = (n) => \"Rp.\" + Number(n || 0).toLocaleString(\"id-ID\");\n\nconst isDeleted = (v) => {\n  v = pick(v);\n  if (v === true) return true;\n  if (v === false || v == null || v === \"\") return false;\n  const s = String(v).toLowerCase().trim();\n  return [\"true\", \"yes\", \"1\"].includes(s);\n};\n\nconst parseAmount = (v) => {\n  v = pick(v);\n  if (v == null || v === \"\") return NaN;\n  if (typeof v === \"number\") return v;\n  const digits = String(v).replace(/[^\\d]/g, \"\");\n  return digits ? Number(digits) : NaN;\n};\n\nconst WIB_OFFSET_MS = 7 * 60 * 60 * 1000;\nconst DAY_MS = 24 * 60 * 60 * 1000;\n\n// 7 hari terakhir (rolling 7x24 jam)\nconst nowUtcMs = Date.now();\nconst startUtcMs = nowUtcMs - 7 * DAY_MS;\n\nconst wibDateStringFromUtcMs = (utcMs) => {\n  const w = new Date(utcMs + WIB_OFFSET_MS);\n  const yy = w.getUTCFullYear();\n  const mm = String(w.getUTCMonth() + 1).padStart(2, \"0\");\n  const dd = String(w.getUTCDate()).padStart(2, \"0\");\n  return `${yy}-${mm}-${dd}`;\n};\n\nconst startStr = wibDateStringFromUtcMs(startUtcMs);\nconst endStr = wibDateStringFromUtcMs(nowUtcMs);\n\nconst filtered = rows.filter(r => {\n  // FILTER MULTI-USER: pakai user_id, bukan chat_id\n  if (String(pick(r.user_id)) !== reqUserId) return false;\n  if (isDeleted(r.is_deleted)) return false;\n\n  const ts = new Date(pick(r.timestamp));\n  const tsMs = ts.getTime();\n  if (!Number.isFinite(tsMs)) return false;\n\n  return tsMs >= startUtcMs && tsMs <= nowUtcMs;\n});\n\nlet total = 0;\nconst perCategory = {};\n\nfor (const r of filtered) {\n  const amt = parseAmount(r.amount);\n  if (!isFinite(amt) || amt <= 0) continue;\n\n  total += amt;\n\n  const cat = (pick(r.category) || \"lainnya\");\n  perCategory[cat] = (perCategory[cat] || 0) + amt;\n}\n\nlet text = `📊 Rekap 7 Hari Terakhir\\n`;\ntext += `🗓️ ${startStr} s/d ${endStr} (WIB)\\n\\n`;\ntext += `💵 Total: ${formatRupiah(total)}\\n`;\ntext += `🧾 Transaksi: ${filtered.length}\\n\\n`;\n\nif (filtered.length === 0) {\n  text += `Belum ada transaksi 7 hari terakhir.`;\n} else {\n  text += `🗂️ Per Kategori:\\n`;\n  Object.entries(perCategory)\n    .sort((a, b) => b[1] - a[1])\n    .forEach(([cat, amt]) => {\n      text += `• ${cat}: ${formatRupiah(amt)}\\n`;\n    });\n}\n\nreturn [{ json: { chat_id: chatId, reply: text } }];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        208,
-        176
+        192,
+        80
       ],
       "id": "b41348e3-8704-44fc-a5d4-5fcd74987ab7",
       "name": "Code in JavaScript1"
@@ -387,8 +410,8 @@
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        416,
-        176
+        400,
+        80
       ],
       "id": "34b79a17-f2ae-4906-95bd-5555813e7c38",
       "name": "Send a text message1",
@@ -428,7 +451,7 @@
       "typeVersion": 4.7,
       "position": [
         0,
-        368
+        304
       ],
       "id": "ec6a69dc-d96c-4f7a-9e51-6cb4b77ba1d9",
       "name": "Get row(s) in sheet1",
@@ -441,13 +464,13 @@
     },
     {
       "parameters": {
-        "jsCode": "const rows = items.map(i => i.json);\nconst chatId = String($node[\"Telegram Trigger\"].json.message.chat.id);\n\nconst formatRupiah = (n) => \"Rp.\" + Number(n || 0).toLocaleString(\"id-ID\");\n\nconst isDeleted = (v) => {\n  if (v === true) return true;\n  if (v === false || v == null || v === \"\") return false;\n  const s = String(v).toLowerCase();\n  return s === \"true\" || s === \"yes\" || s === \"1\";\n};\n\n// Ambil transaksi milik user yang belum dihapus (kalau kamu memang pakai hard delete, ini tetap aman)\nconst mine = rows\n  .filter(r => String(r.chat_id) === chatId && !isDeleted(r.is_deleted))\n  .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));\n\nif (mine.length === 0) {\n  return [{\n    json: {\n      chat_id: chatId,\n      status: \"empty\",\n      reply: \"ℹ️ Tidak ada transaksi yang bisa di-undo.\"\n    }\n  }];\n}\n\nconst last = mine[0];\n\nreturn [{\n  json: {\n    chat_id: chatId,\n    status: \"found\",\n    row_number: last.row_number,\n    reply:\n`↩️ Undo berhasil\n\n🗂️ Kategori : ${last.category || \"lainnya\"}\n💵 Nominal  : ${formatRupiah(last.amount)}\n\n🗓️ ${String(last.date || \"\").trim() || \"-\"}\n🕰️ ${String(last.time || \"\").trim() || \"-\"}`,\n  }\n}];\n"
+        "jsCode": "const rows = items.map(i => i.json);\nconst tgMsg = $node[\"Telegram Trigger\"].json.message;\nconst chatId = String(tgMsg.chat.id);\nconst reqUserId = String(tgMsg.from.id);\n\nconst formatRupiah = (n) => \"Rp.\" + Number(n || 0).toLocaleString(\"id-ID\");\n\nconst isDeleted = (v) => {\n  if (v === true) return true;\n  if (v === false || v == null || v === \"\") return false;\n  const s = String(v).toLowerCase();\n  return s === \"true\" || s === \"yes\" || s === \"1\";\n};\n\n\nconst mine = rows\n  .filter(r => String(r.user_id) === reqUserId && !isDeleted(r.is_deleted))\n  .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));\n\nif (mine.length === 0) {\n  return [{\n    json: {\n      chat_id: chatId,\n      status: \"empty\",\n      reply: \"ℹ️ Tidak ada transaksi yang bisa di-undo.\"\n    }\n  }];\n}\n\nconst last = mine[0];\n\nreturn [{\n  json: {\n    chat_id: chatId,\n    status: \"found\",\n    row_number: last.row_number,\n    reply:\n`↩️ Undo berhasil\n\n🗂️ Kategori : ${last.category || \"lainnya\"}\n💵 Nominal  : ${formatRupiah(last.amount)}\n\n🗓️ ${String(last.date || \"\").trim() || \"-\"}\n🕰️ ${String(last.time || \"\").trim() || \"-\"}`,\n  }\n}];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         208,
-        368
+        304
       ],
       "id": "3f73c431-9d9f-4b4b-8789-f520287a6d0e",
       "name": "Code in JavaScript2"
@@ -481,7 +504,7 @@
       "typeVersion": 2.3,
       "position": [
         416,
-        368
+        304
       ],
       "id": "82bd23f0-ba10-44b9-96c7-f9b175b8c7c5",
       "name": "If"
@@ -508,8 +531,8 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
       "position": [
-        656,
-        352
+        640,
+        240
       ],
       "id": "df979569-5f13-409c-861e-e61951e45a74",
       "name": "Delete rows or columns from sheet",
@@ -531,8 +554,8 @@
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        864,
-        352
+        832,
+        240
       ],
       "id": "85311078-945b-40fd-8b4d-c6dfcfac3957",
       "name": "Send a text message2",
@@ -556,7 +579,7 @@
       "typeVersion": 1.2,
       "position": [
         656,
-        560
+        464
       ],
       "id": "6af5cebf-b5dd-4f23-965a-d84e296dfd71",
       "name": "Send a text message3",
@@ -567,6 +590,115 @@
           "name": "Telegram account"
         }
       }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1LxxrgvKLQDJAjNmJtm2sQPHt8j_SP4zC3v5Q768SQxc",
+          "mode": "list",
+          "cachedResultName": "Keuangan Lhs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1LxxrgvKLQDJAjNmJtm2sQPHt8j_SP4zC3v5Q768SQxc/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "transactions",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1LxxrgvKLQDJAjNmJtm2sQPHt8j_SP4zC3v5Q768SQxc/edit#gid=0"
+        },
+        "options": {
+          "dataLocationOnSheet": {
+            "values": {
+              "rangeDefinition": "specifyRange"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        0,
+        576
+      ],
+      "id": "de4fd9a6-cd52-42be-a2e5-1b5535df8ef3",
+      "name": "Get row(s) in sheet2",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "dTFmwS0cmxAWCGUZ",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = items.map(i => i.json);\n\nconst msg = $node[\"Telegram Trigger\"].json.message;\nconst userId = String(msg.from.id);\n\nconst pick = (v) => Array.isArray(v) ? v[0] : v;\n\nconst WIB_OFFSET_MS = 7 * 60 * 60 * 1000;\n\nfunction toWibDatePartsFromUtcMs(utcMs) {\n  const w = new Date(utcMs + WIB_OFFSET_MS);\n  const pad = (x) => String(x).padStart(2, \"0\");\n  const yyyy = w.getUTCFullYear();\n  const mm = pad(w.getUTCMonth() + 1);\n  const dd = pad(w.getUTCDate());\n  return { yyyy, mm, dd };\n}\n\nfunction parseAmount(v) {\n  v = pick(v);\n  if (v == null || v === \"\") return NaN;\n  if (typeof v === \"number\") return v;\n  const digits = String(v).replace(/[^\\d]/g, \"\");\n  return digits ? Number(digits) : NaN;\n}\n\nfunction isDeleted(v) {\n  v = pick(v);\n  if (v === true) return true;\n  if (v === false || v == null || v === \"\") return false;\n  const s = String(v).toLowerCase().trim();\n  return [\"true\", \"yes\", \"1\"].includes(s);\n}\n\n// batas bulan berjalan WIB\nconst nowUtcMs = Date.now();\nconst nowWib = toWibDatePartsFromUtcMs(nowUtcMs);\n\nconst startWibAsUtcMs = Date.UTC(\n  Number(nowWib.yyyy),\n  Number(nowWib.mm) - 1,\n  1, 0, 0, 0\n) - WIB_OFFSET_MS;\n\nconst startLabel = `${nowWib.yyyy}-${nowWib.mm}-01`;\nconst endLabel = `${nowWib.yyyy}-${nowWib.mm}-${nowWib.dd}`;\nconst period_label = `${startLabel} s/d ${endLabel} (WIB)`;\n\n// filter bulan berjalan + per user + bukan deleted\nconst filtered = rows.filter(r => {\n  if (String(pick(r.user_id)) !== userId) return false;\n  if (isDeleted(r.is_deleted)) return false;\n\n  const tsMs = new Date(pick(r.timestamp)).getTime();\n  if (!Number.isFinite(tsMs)) return false;\n\n  return tsMs >= startWibAsUtcMs && tsMs <= nowUtcMs;\n});\n\n// export 4 kolom\nconst exportRows = filtered\n  .sort((a, b) => new Date(pick(a.timestamp)) - new Date(pick(b.timestamp)))\n  .map(r => ({\n    tanggal: String(pick(r.date) || \"\"),\n    waktu: String(pick(r.time) || \"\"),\n    nominal: Number.isFinite(parseAmount(r.amount)) ? parseAmount(r.amount) : 0,\n    kategori: String(pick(r.category) || \"\"),\n  }));\n\nreturn [{\n  json: {\n    chat_id: String(msg.chat.id),\n    user_id: userId,\n    period_label,\n    row_count: exportRows.length,\n    exportRows,\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        176,
+        576
+      ],
+      "id": "f42a92dc-743b-4521-8dd9-baf0788c0101",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "options": {
+          "fileName": "=recap-{{$json.period_label}}-user-{{$json.user_id}}.xlsx",
+          "headerRow": true,
+          "sheetName": "Rekap"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        496,
+        672
+      ],
+      "id": "639dca61-73bf-47cc-bf72-d05939298278",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "operation": "sendDocument",
+        "chatId": "={{$node[\"Code in JavaScript3\"].json.chat_id}}",
+        "binaryData": true,
+        "additionalFields": {
+          "caption": "=Rekap bulan berjalan \nPeriode: {{$node[\"Code in JavaScript3\"].json.period_label}} \nTotal transaksi: {{$node[\"Code in JavaScript3\"].json.row_count}}"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        672,
+        672
+      ],
+      "id": "d392b06e-205c-4ad9-a195-41689f7ceaa7",
+      "name": "Send a document",
+      "webhookId": "4ec58200-dfe3-49ee-8dbf-71e231b80f7f",
+      "credentials": {
+        "telegramApi": {
+          "id": "kejhnikbarNp7SsN",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "exportRows",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        384,
+        544
+      ],
+      "id": "ed901fcd-2150-469e-a5e1-0fe09164fe6c",
+      "name": "Split Out"
     }
   ],
   "pinData": {},
@@ -612,6 +744,13 @@
         [
           {
             "node": "Get row(s) in sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get row(s) in sheet2",
             "type": "main",
             "index": 0
           }
@@ -701,6 +840,50 @@
           }
         ]
       ]
+    },
+    "Get row(s) in sheet2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Send a document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
@@ -708,7 +891,7 @@
     "executionOrder": "v1",
     "availableInMCP": false
   },
-  "versionId": "c0b0bc4a-8f1f-4ea2-b873-8906b542961b",
+  "versionId": "a3401aff-1f04-466c-8194-8946fcfae8e9",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "1563b341c8ffc9dd358aa2bae59f11cf23611abbae69c8cbfb6e7e1e60a4ab9a"
